@@ -19,7 +19,7 @@ mkdir -p "$(dirname "$CHECKPOINT_PATH")"
 mkdir -p "$(dirname "$TENSORBOARD_LOGS_PATH")"
 
 # Distributed training setup
-GPUS_PER_NODE=8
+GPUS_PER_NODE=2
 NUM_NODES=1
 MASTER_ADDR=${MASTER_ADDR:-localhost}
 MASTER_PORT=${MASTER_PORT:-6000}
@@ -30,13 +30,13 @@ WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
 PRETRAIN_SCRIPT_PATH="pretrain_gpt.py"
 
 # Fixed model and training parameters
-TP_SIZE=1     
+TP_SIZE=2
 CP_SIZE=1     
 PP_SIZE=1     
 MICRO_BATCH_SIZE=1
-GLOBAL_BATCH_SIZE=128
-NUM_LAYERS=32  
-DTYPE="fp8"
+GLOBAL_BATCH_SIZE=64
+NUM_LAYERS=8  
+DTYPE="bf16"
 SEQ_LENGTH=8192
 MAX_POSITION_EMBEDDINGS=8192
 
@@ -79,9 +79,9 @@ MODEL_ARGS=(
 TRAINING_ARGS=(
     --micro-batch-size $MICRO_BATCH_SIZE
     --global-batch-size $GLOBAL_BATCH_SIZE
-    --train-samples 1953125000
-    --lr-decay-samples 1949218748
-    --lr-warmup-samples 3906252
+    --train-samples 1024
+    --lr-decay-samples 1024
+    --lr-warmup-samples 192
     --lr 0.00015
     --min-lr 0.00001
     --decoupled-lr 5.0e-4      # Specific to decoupled AdamW, ensure optimizer is compatible
@@ -162,8 +162,8 @@ fi
 EVAL_AND_LOGGING_ARGS=(
     --log-interval 1
     --eval-iters 32
-    --eval-interval 100
-    --save-interval 1000
+    --eval-interval 8
+    --save-interval 16
     --log-throughput
     --profile
     --profile-step-start 4
@@ -171,7 +171,7 @@ EVAL_AND_LOGGING_ARGS=(
     --ckpt-format torch_dist 
     --distributed-timeout-minutes 60
     --save "$CHECKPOINT_PATH"
-    --load "$CHECKPOINT_PATH" 
+    # --load "$CHECKPOINT_PATH" 
     --tensorboard-dir "$TENSORBOARD_LOGS_PATH"
 )
 

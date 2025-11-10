@@ -4,6 +4,7 @@ for distributed training frameworks, e.g., Megatron-LM.
 """
 
 import torch
+import traceback
 from megatron.core import mpu
 
 
@@ -18,7 +19,7 @@ class FaultInjector:
                  interval: int = 1,
                  max_injections: int = -1,
                  target_tp_rank: int = 0,
-                 fault_type: str = 'nan'):
+                 fault_type: str = 'null'):
         self.target_module = target_module
         self.target_function = target_function
         self.start_call = start_call
@@ -27,10 +28,10 @@ class FaultInjector:
         self.target_tp_rank = target_tp_rank
         self.fault_type = fault_type
 
-        if self.error_type not in ['nan', 'inf', 'exception']:
-            raise ValueError("error_type must be one of 'nan', 'inf', or 'exception'")
-        if self.margin <= 0:
-            raise ValueError("margin must be a positive integer.")
+        if self.fault_type not in ['nan', 'inf', 'exception', 'null']:
+            raise ValueError("fault_type must be one of 'nan', 'inf', 'exception', or 'null'.")
+        if self.interval <= 0:
+            raise ValueError("interval must be a positive integer.")
         if self.start_call < 0:
             raise ValueError("start_call must be a non-negative integer.")
         if self.max_injections < -1:
@@ -45,7 +46,7 @@ class FaultInjector:
         self._injection_count = 0
 
     def _should_inject(self):
-        if self.max_injections != -1 and self._injections_count >= self.max_injections:
+        if self.max_injections != -1 and self._injection_count >= self.max_injections:
             return False
             
         if self._call_count < self.start_call:
@@ -65,10 +66,10 @@ class FaultInjector:
                 current_tp_rank = mpu.get_tensor_model_parallel_rank()
                 
                 if current_tp_rank == self.target_tp_rank:
-                    self._injections_count += 1
+                    self._injection_count += 1
                     rank = torch.distributed.get_rank()
                     print(
-                        f"[FaultInjector] Injecting {self.fault_type} to {self.target_module.__name__}.{self.target_function} on TP rank {current_tp_rank}, "
+                        f"[FaultInjector] Injecting {self.fault_type} to {self.target_module.__name__}.{self.target_function} on TP rank {rank}, "
                         f"call count: {self._call_count}, injection count: {self._injection_count}",
                         flush=True
                     )
@@ -83,6 +84,10 @@ class FaultInjector:
                     elif self.fault_type == 'exception':
                         # The exception will prevent the original function from being called
                         raise RuntimeError(f"Exception injected by FaultInjector")
+                    elif self.fault_type == 'null':
+                        # Print the stack trace for debugging
+                        print(f"[FaultInjector] Debugging call {self._call_count}", flush=True)
+                        traceback.print_stack()
 
             return self._original_function(*args, **kwargs)
         finally:

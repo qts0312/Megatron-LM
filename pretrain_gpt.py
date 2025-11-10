@@ -35,7 +35,7 @@ except ImportError:
     has_nvidia_modelopt = False
 
 from fault_injector import FaultInjector
-from megatron.core.tensor_parallel import mappings
+import torch.distributed as dist
 
 stimer = StragglerDetector()
 
@@ -235,11 +235,11 @@ if __name__ == "__main__":
     pretrain, store = inprocess_restart.maybe_wrap_for_inprocess_restart(pretrain)
 
     injector = FaultInjector(
-        target_module=mappings,
-        target_function='_reduce',
-        max_injections=1,
+        target_module=dist,
+        target_function='all_reduce',
+        start_call=0,
         target_tp_rank=1,
-        fault_type='nan',
+        fault_type='null',
     )
 
     pretrain(

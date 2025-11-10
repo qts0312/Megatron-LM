@@ -34,6 +34,9 @@ try:
 except ImportError:
     has_nvidia_modelopt = False
 
+from fault_injector import FaultInjector
+from megatron.core.tensor_parallel import mappings
+
 stimer = StragglerDetector()
 
 
@@ -231,6 +234,14 @@ if __name__ == "__main__":
     # Optionally enable inprocess restart on pretrain
     pretrain, store = inprocess_restart.maybe_wrap_for_inprocess_restart(pretrain)
 
+    injector = FaultInjector(
+        target_module=mappings,
+        target_function='_reduce',
+        max_injections=1,
+        target_tp_rank=1,
+        fault_type='nan',
+    )
+
     pretrain(
         train_valid_test_datasets_provider,
         partial(model_provider, gpt_builder),
@@ -239,4 +250,5 @@ if __name__ == "__main__":
         args_defaults={'tokenizer_type': 'GPT2BPETokenizer'},
         extra_args_provider=add_modelopt_args if has_nvidia_modelopt else None,
         store=store,
+        fault_injector=injector,
     )

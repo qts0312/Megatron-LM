@@ -540,6 +540,7 @@ def pretrain(
     non_loss_data_func=None,
     store=None,
     inprocess_call_wrapper: Optional[CallWrapper] = None,
+    fault_injector=None,
 ):
     """Main training program.
 
@@ -727,43 +728,50 @@ def pretrain(
     if not args.skip_train:
         print_rank_0('training ...')
 
-        if args.dataloader_type == 'cyclic' and args.retro_project_dir:
-            assert args.retro_cyclic_train_iters is not None
-            args.train_iters = args.retro_cyclic_train_iters
-            print_rank_0("retro cyclic train iters : %d" % args.train_iters)
+        def train_wrapper():
+            if args.dataloader_type == 'cyclic' and args.retro_project_dir:
+                assert args.retro_cyclic_train_iters is not None
+                args.train_iters = args.retro_cyclic_train_iters
+                print_rank_0("retro cyclic train iters : %d" % args.train_iters)
 
-        iteration = 0
-        if args.do_train and args.train_iters > 0:
-            iteration, num_floating_point_operations_so_far = train(
-                forward_step_func,
-                model,
-                optimizer,
-                opt_param_scheduler,
-                train_data_iterator,
-                valid_data_iterator,
-                process_non_loss_data_func,
-                config,
-                checkpointing_context,
-                non_loss_data_func,
+            iteration = 0
+            if args.do_train and args.train_iters > 0:
+                iteration, num_floating_point_operations_so_far = train(
+                    forward_step_func,
+                    model,
+                    optimizer,
+                    opt_param_scheduler,
+                    train_data_iterator,
+                    valid_data_iterator,
+                    process_non_loss_data_func,
+                    config,
+                    checkpointing_context,
+                    non_loss_data_func,
+                )
+
+            print_datetime('after training is done')
+
+            if args.save and iteration != 0 and iteration % args.save_interval != 0:
+                save_checkpoint(
+                    iteration,
+                    model,
+                    optimizer,
+                    opt_param_scheduler,
+                    num_floating_point_operations_so_far,
+                    checkpointing_context,
+                    train_data_iterator=train_data_iterator,
+                    preprocess_common_state_dict_fn=preprocess_common_state_dict,
+                )
+
+            one_logger and one_logger.log_metrics(
+                {'app_train_loop_finish_time': one_logger_utils.get_timestamp_in_ms()}
             )
 
-        print_datetime('after training is done')
-
-        if args.save and iteration != 0 and iteration % args.save_interval != 0:
-            save_checkpoint(
-                iteration,
-                model,
-                optimizer,
-                opt_param_scheduler,
-                num_floating_point_operations_so_far,
-                checkpointing_context,
-                train_data_iterator=train_data_iterator,
-                preprocess_common_state_dict_fn=preprocess_common_state_dict,
-            )
-
-        one_logger and one_logger.log_metrics(
-            {'app_train_loop_finish_time': one_logger_utils.get_timestamp_in_ms()}
-        )
+        if fault_injector:
+            with fault_injector:
+                train_wrapper()
+        else:
+            train_wrapper()
 
     else:
         print_rank_0('skipping training (--skip-train is on) ...')

@@ -161,7 +161,7 @@ fi
 
 EVAL_AND_LOGGING_ARGS=(
     --log-interval 1
-    --eval-iters 32
+    --eval-iters 8
     --eval-interval 8
     --save-interval 16
     --log-throughput

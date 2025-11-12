@@ -1850,7 +1850,7 @@ def get_batch_on_this_cp_rank(batch: Dict[str, Any]):
 ### NVTX profiling ###
 ######################
 
-_nvtx_enabled: bool = False  # Whether NVTX range profiling is enabled
+_nvtx_enabled: bool = True  # Whether NVTX range profiling is enabled
 _nvtx_range_messages: list[str] = []  # Messages associated with active NVTX ranges
 
 

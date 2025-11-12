@@ -3,11 +3,13 @@ PYTORCH_IMAGE="nvcr.io/nvidia/pytorch:25.03-py3"
 HOST_MEGATRON_LM_DIR="${HOME}/Megatron-LM"
 HOST_CHECKPOINT_PATH="${HOME}/checkpoints/llama3_8b_bf16"
 HOST_TENSORBOARD_LOGS_PATH="${HOME}/tensorboard_logs/llama3_8b_bf16"
+HOST_INTERCEPTOR_PATH="${HOME}/InjectLLM"
 
 docker run -it --rm --gpus all --ipc=host --ulimit memlock=-1 \
   -v "${HOST_MEGATRON_LM_DIR}:/workspace/megatron-lm" \
   -v "${HOST_CHECKPOINT_PATH}:/workspace/checkpoints" \
   -v "${HOST_TENSORBOARD_LOGS_PATH}:/workspace/tensorboard_logs" \
+  -v "${HOST_INTERCEPTOR_PATH}:/workspace/injectllm" \
   --workdir /workspace/megatron-lm \
   $PYTORCH_IMAGE \
   bash

@@ -2,6 +2,7 @@
 
 # Environment variables for performance tuning
 export CUDA_DEVICE_MAX_CONNECTIONS=${CUDA_DEVICE_MAX_CONNECTIONS:-1}
+export NVTE_NVTX_ENABLED=1
 #export LOG_LEVEL=${LOG_LEVEL:-INFO}
 #export NCCL_IB_TIMEOUT=${NCCL_IB_TIMEOUT:-19}
 #export NVTE_FWD_LAYERNORM_SM_MARGIN=${NVTE_FWD_LAYERNORM_SM_MARGIN:-16}
@@ -17,6 +18,33 @@ DATA_ARG=${4:-"MOCK"}     # Data prefix, or "MOCK"
 # Create directories if they don't exist
 mkdir -p "$(dirname "$CHECKPOINT_PATH")"
 mkdir -p "$(dirname "$TENSORBOARD_LOGS_PATH")"
+
+# Set up NCCL interceptor
+INTERCEPTOR_SO_PATH="/workspace/injectllm/nccl_interceptor/src/cpp/libinterceptor.so"
+
+if [ ! -f "$INTERCEPTOR_SO_PATH" ]; then
+    echo "libinterceptor.so not found at $INTERCEPTOR_SO_PATH!"
+    echo "Building..."
+    (cd "/workspace/injectllm/nccl_interceptor" && ./build.sh)
+    if [ ! -f "$INTERCEPTOR_SO_PATH" ]; then
+        echo "Build failed. Exiting."
+        exit 1
+    fi
+fi
+
+export LD_PRELOAD=$INTERCEPTOR_SO_PATH
+
+export NCCL_INTERCEPT_LOG="1"
+export NCCL_INTERCEPT_FAULT="0"
+export FAULT_INJECTION_RANK="1"
+export FAULT_INJECTION_FUNCTION="ncclAllReduce"
+export FAULT_INJECTION_TARGET="" 
+
+echo "Control Options:"
+echo "  FAULT_INJECTION_FLAG=${NCCL_INTERCEPT_FAULT}"
+echo "  FAULT_INJECTION_RANK=${FAULT_INJECTION_RANK}"
+echo "  FAULT_INJECTION_FUNCTION=${FAULT_INJECTION_FUNCTION}"
+echo "  FAULT_INJECTION_TARGET=${FAULT_INJECTION_TARGET}"
 
 # Distributed training setup
 GPUS_PER_NODE=2

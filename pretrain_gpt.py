@@ -2,6 +2,25 @@
 
 """Pretrain and SFT GPT."""
 
+import sys
+import os
+
+try:
+    patch_dir = os.path.join('/workspace', 'injectllm', 'nccl_interceptor', 'src', 'python')
+    
+    if patch_dir not in sys.path:
+        sys.path.insert(0, patch_dir)
+    
+    import interceptor_patch 
+    
+    if int(os.environ.get("RANK", 0)) == 0:
+        print(f"NCCL Interceptor Patch loaded from: {patch_dir}")
+
+except Exception as e:
+    print(f"CRITICAL: Failed to import interceptor_patch from {patch_dir}")
+    print(f"Error: {e}")
+    sys.exit(1)
+
 from functools import partial
 from typing import List, Optional, Tuple
 
@@ -234,14 +253,6 @@ if __name__ == "__main__":
     # Optionally enable inprocess restart on pretrain
     pretrain, store = inprocess_restart.maybe_wrap_for_inprocess_restart(pretrain)
 
-    injector = FaultInjector(
-        target_module=dist,
-        target_function='all_reduce',
-        start_call=0,
-        target_tp_rank=1,
-        fault_type='null',
-    )
-
     pretrain(
         train_valid_test_datasets_provider,
         partial(model_provider, gpt_builder),
@@ -250,5 +261,4 @@ if __name__ == "__main__":
         args_defaults={'tokenizer_type': 'GPT2BPETokenizer'},
         extra_args_provider=add_modelopt_args if has_nvidia_modelopt else None,
         store=store,
-        fault_injector=injector,
     )
